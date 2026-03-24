@@ -1,0 +1,51 @@
+# ============================================================
+# Markdown docs — keep only README
+# ============================================================
+*.md
+!README.md
+
+# ============================================================
+# Laravel
+# ============================================================
+/vendor/
+/node_modules/
+
+# Environment — NEVER commit credentials
+.env
+.env.backup
+.env.production
+
+# Laravel generated / cache
+/bootstrap/cache/
+/storage/*.key
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/testing/
+storage/framework/views/
+storage/logs/
+storage/app/visitors/
+
+# ============================================================
+# Testing
+# ============================================================
+.phpunit.result.cache
+.phpunit.cache/
+
+# ============================================================
+# Laravel public links / hot reload
+# ============================================================
+/public/hot
+/public/storage
+
+# ============================================================
+# IDEs & Editors
+# ============================================================
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ============================================================
+# Composer
+# ============================================================
+composer.phar
