@@ -1,8 +1,9 @@
 # EFL Visitor App — API REST Backend
 
-![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel&logoColor=white)
-![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?logo=php&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
+![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-8.5-777BB4?logo=php&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white)
+![Sanctum](https://img.shields.io/badge/Sanctum-4.3-FF2D20?logo=laravel&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 RESTful API backend for the **EFL Visitor Management System**. Powers Android tablets at physical entry stations to register visitors, manage check-in/check-out, and capture identification photos and documents.
@@ -17,9 +18,11 @@ RESTful API backend for the **EFL Visitor Management System**. Powers Android ta
 - **Check-in / check-out** tracking per station
 - **Multi-station support** — each tablet authenticates independently via API Key
 - **Admin panel endpoints** — visit history, filters, stats, station management
-- **Two-layer authentication** — API Key for tablets, Bearer Token for admins
+- **Admin user management** — create/deactivate admins, revoke sessions instantly (super_admin only)
+- **Two-layer auth** — `X-API-Key` for tablets · Sanctum Bearer token for admins
 - **Images served securely** — never publicly accessible, always behind auth
-- **Fully versioned API** starting at `/api/v1/`
+- **Audit log** — every sensitive admin action is logged to a daily rotating file
+- **Fully versioned API** at `/api/v1/`
 - **Database-agnostic** — MySQL, SQL Server, PostgreSQL with zero code changes
 
 ---
@@ -28,13 +31,13 @@ RESTful API backend for the **EFL Visitor Management System**. Powers Android ta
 
 | Layer | Technology |
 |---|---|
-| Framework | Laravel 12 |
+| Framework | Laravel 13 |
 | ORM | Eloquent |
-| Authentication | Laravel Sanctum |
-| Database | MySQL (dev) · SQL Server / PostgreSQL (prod-ready) |
+| Authentication | Laravel Sanctum 4.3 |
+| Database | MySQL 8.4 (dev) · SQL Server / PostgreSQL (prod-ready) |
 | Image Storage | Laravel Storage (local → S3 / Azure Blob via config) |
-| Web Server | Apache + mod_rewrite |
-| PHP | 8.2+ |
+| Web Server | IIS / Apache + mod_rewrite |
+| PHP | 8.5+ |
 
 ---
 
@@ -43,71 +46,119 @@ RESTful API backend for the **EFL Visitor Management System**. Powers Android ta
 ```
 app/
 ├── Http/
-│   ├── Controllers/Api/V1/   ← versioned controllers
+│   ├── Controllers/Api/V1/
+│   │   ├── Admin/            ← AuthController, VisitController, StationController
+│   │   │                        StatsController, UserController
+│   │   └── (tablet)          ← AuthController, VisitorController, VisitController
+│   │                            ImageController, StationController
 │   ├── Middleware/            ← API Key auth, HTTPS, security headers
-│   └── Requests/             ← input validation (prevents injection)
-├── Models/                   ← Eloquent: Station, Visitor, Visit, VisitImage
-├── Repositories/             ← all DB queries isolated here
-├── Services/                 ← business logic (VisitorService, VisitService, ImageService)
-└── Resources/                ← JSON response formatting
+│   ├── Requests/             ← input validation (FormRequests)
+│   └── Resources/            ← JSON response shaping
+├── Models/                   ← Station, Visitor, Visit, VisitImage, User
+├── Services/                 ← ImageService (business logic)
+└── Support/
+    └── AuditLogger.php       ← structured audit log helper
 
 database/
 ├── migrations/               ← versioned schema
-└── seeders/                  ← test data
+└── seeders/                  ← default super_admin seed
 
 routes/
-└── api.php                   ← all API routes
+└── api.php                   ← all routes
 
-storage/app/visitors/         ← images (local dev / cloud prod)
+storage/
+├── app/visitors/             ← images (local dev / cloud prod)
+└── logs/audit-YYYY-MM-DD.log ← daily rotating audit log (90-day retention)
+
+docs/
+├── API.md                    ← full endpoint reference
+└── ANDROID_INTEGRATION.md   ← step-by-step Android Studio guide
 ```
 
-The architecture follows a **Repository + Service + Resource** pattern:
-
-```
-Request → Controller → Service → Repository → Eloquent → DB
-                           ↓
-                       Resource → JSON Response
-```
+Architecture: `Request → Controller → Service → Eloquent → DB → Resource → JSON`
 
 ---
 
 ## API Endpoints
 
-**Base URL:** `https://visitors-api.yourdomain.com/api/v1/`
+**Base URL:** `https://your-server/api/v1/`  
+Full reference with request/response bodies → [`docs/API.md`](docs/API.md)
 
-| Group | Method | Endpoint | Description |
-|---|---|---|---|
-| **Auth** | `POST` | `/auth/validate-station` | Validate station code, receive API Key |
-| | `GET` | `/station/me` | Authenticated station info |
-| **Visitors** | `GET` | `/visitors/search?q=` | Search visitors by name |
-| | `POST` | `/visitors` | Create new visitor |
-| | `PUT` | `/visitors/{id}` | Update visitor |
-| | `GET` | `/visitors/{id}/latest-visit` | Last visit for a visitor |
-| **Visits** | `POST` | `/visits` | Check-in (new visit) |
-| | `PATCH` | `/visits/{id}/checkout` | Check-out |
-| | `GET` | `/visits/{id}` | Visit details |
-| | `GET` | `/visits/active` | Active visits at this station |
-| **Images** | `POST` | `/visits/{id}/images` | Upload photo / document |
-| | `GET` | `/visits/{id}/images/{type}` | Retrieve image by type |
-| **Admin** | `POST` | `/admin/login` | Admin login |
-| | `GET` | `/admin/visits` | Visit list with filters and pagination |
-| | `GET` | `/admin/stats` | Stats by station and period |
-| | `GET/POST` | `/admin/stations` | List or create stations |
+### Tablet endpoints (`X-API-Key`)
 
-All responses follow a consistent envelope:
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/auth/validate-station` | Exchange station code for API Key (setup only) |
+| `GET` | `/station/me` | Authenticated station info |
+| `GET` | `/visitors/search?q=` | Incremental search (min 2 chars, max 20 results) |
+| `POST` | `/visitors` | Create visitor |
+| `PUT` | `/visitors/{id}` | Update visitor |
+| `GET` | `/visitors/{id}/latest-visit` | Last recorded visit |
+| `POST` | `/visits` | Check-in |
+| `GET` | `/visits/active` | Active visits at this station |
+| `GET` | `/visits/{id}` | Visit detail |
+| `PATCH` | `/visits/{id}/checkout` | Check-out |
+| `POST` | `/visits/{id}/images` | Upload photo / document (multipart, max 5 MB) |
+| `GET` | `/visits/{id}/images/{type}` | Stream image bytes |
+
+### Admin endpoints (`Authorization: Bearer <token>`)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/admin/login` | Login — returns Bearer token |
+| `POST` | `/admin/logout` | Revoke current token |
+| `GET` | `/admin/me` | Current admin info |
+| `GET` | `/admin/visits` | Visit list with filters + pagination |
+| `GET` | `/admin/visits/{id}` | Visit detail |
+| `PATCH` | `/admin/visits/{id}/status` | Change visit status |
+| `GET` | `/admin/stats` | Aggregated metrics |
+| `GET` | `/admin/stations` | List stations |
+| `POST` | `/admin/stations` | Create station |
+| `GET` | `/admin/users` | *(super_admin)* List admin users |
+| `POST` | `/admin/users` | *(super_admin)* Create admin |
+| `PATCH` | `/admin/users/{id}` | *(super_admin)* Edit / deactivate admin |
+| `POST` | `/admin/users/{id}/revoke-tokens` | *(super_admin)* Force logout all sessions |
+
+### Response envelope (uniform)
 
 ```json
-{ "success": true, "data": { ... }, "message": "Visit registered successfully" }
-{ "success": false, "message": "Validation failed", "errors": { ... }, "code": "VALIDATION_ERROR" }
+{ "success": true, "data": { ... }, "message": "..." }
+{ "success": false, "message": "...", "code": "VALIDATION_ERROR", "errors": { "campo": ["..."] } }
 ```
 
 ---
 
 ## Authentication
 
-**Tablets** authenticate with a per-station `X-API-Key` header. Keys are generated when a station is registered and can be revoked individually without affecting other stations.
+**Tablets** use a per-station `X-API-Key` header. The key is retrieved once via `POST /auth/validate-station` using the station code, then stored securely on the device. Each station's key can be regenerated without affecting others.
 
-**Admins** authenticate via `POST /admin/login` and receive a Bearer Token (24h expiration) managed by Laravel Sanctum.
+**Admins** log in via `POST /admin/login` and receive a Sanctum Bearer token. Only one active session per login (previous tokens are revoked on login). Token is invalidated immediately on logout or when a `super_admin` calls `revoke-tokens`.
+
+**Roles:** `admin` (access to visits/stats/stations) · `super_admin` (everything + user management).
+
+---
+
+## Rate Limits
+
+| Endpoint group | Limit |
+|---|---|
+| `POST /auth/validate-station` | 5 / hour / IP |
+| `POST /admin/login` | 10 / hour / IP |
+| Tablet JSON endpoints | 120 / min / station |
+| Image uploads | 30 / min / station |
+| Admin endpoints | 200 / min / user |
+
+Exceeding any limit returns `429 RATE_LIMIT_EXCEEDED` with a `Retry-After` header.
+
+---
+
+## Audit Log
+
+All sensitive admin actions are written to `storage/logs/audit-YYYY-MM-DD.log` (daily rotation, 90-day retention configurable via `LOG_AUDIT_DAYS` env).
+
+Logged events: `admin.login.success/failed/denied`, `admin.logout`, `admin.visit.status_changed`, `admin.station.created`, `admin.user.created/updated/tokens_revoked`.
+
+Each entry includes: `user_id`, `user_email`, `ip`, `user_agent`, and action-specific context fields.
 
 ---
 
@@ -115,9 +166,9 @@ All responses follow a consistent envelope:
 
 ### Requirements
 
-- PHP 8.2+
+- PHP 8.5+
 - Composer
-- MySQL 8.0+
+- MySQL 8.4+
 
 ### Installation
 
@@ -129,16 +180,11 @@ composer install
 cp .env.example .env
 php artisan key:generate
 
-# 3. Configure your database in .env, then run migrations
-php artisan migrate
-
-# 4. (Optional) Seed with test data
-php artisan db:seed
+# 3. Configure your database in .env, then run migrations + seed
+php artisan migrate --seed
 ```
 
-### Environment
-
-All environment-specific config lives in `.env` — the code has no hardcoded credentials or connection strings.
+### Key environment variables
 
 ```env
 DB_CONNECTION=mysql
@@ -147,29 +193,38 @@ DB_DATABASE=visitors_dev
 DB_USERNAME=your_user
 DB_PASSWORD=your_password
 
-APP_URL=https://visitors-api.yourdomain.com
+APP_URL=https://your-server
 FILESYSTEM_DISK=local
+
+LOG_AUDIT_DAYS=90
 ```
 
-> Migrating to Azure or changing databases = update `.env` + import data. No code changes required.
+The seeder creates a default `super_admin` — **change the password before going to production**.
+
+> Migrating to Azure or swapping databases = update `.env` only. No code changes required.
 
 ---
 
 ## Security Highlights
 
 - HTTPS enforced on every request — HTTP redirected automatically
-- Rate limiting on all sensitive endpoints (5 attempts/hour on station auth, 10 on admin login)
+- Rate limiting on all sensitive endpoints
 - Security headers on every response (`HSTS`, `X-Frame-Options`, `CSP`, etc.)
 - SQL Injection prevented by design — Eloquent uses prepared statements exclusively
 - Images stored outside `public/`, served only through authenticated endpoints
-- Logs never contain passwords or full tokens
+- Audit log for all admin actions — logs never contain passwords or full tokens
+- Deactivating an admin user instantly revokes all active Bearer tokens
 
 ---
 
-## Full Technical Specification
+## Documentation
 
-See [API_EXECUTION_PLAN.md](API_EXECUTION_PLAN.md) for the complete technical plan including database schema, security policies, rate limits, and phased execution roadmap.
+| Document | Description |
+|---|---|
+| [`docs/API.md`](docs/API.md) | Full endpoint reference — auth, request bodies, responses, error codes |
+| [`docs/ANDROID_INTEGRATION.md`](docs/ANDROID_INTEGRATION.md) | Step-by-step Android Studio integration guide (Retrofit, offline-first, sync queue) |
+| [`API_EXECUTION_PLAN.md`](API_EXECUTION_PLAN.md) | Full technical plan — DB schema, security policy, phased roadmap |
 
 ---
 
-*EFL Visitor App Backend · Laravel 12 · March 2026*
+*EFL Visitor App Backend · Laravel 13 · May 2026*
