@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Api\V1\Admin\StationController as AdminStationController;
+use App\Http\Controllers\Api\V1\Admin\StatsController as AdminStatsController;
+use App\Http\Controllers\Api\V1\Admin\VisitController as AdminVisitController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ImageController;
 use App\Http\Controllers\Api\V1\StationController;
@@ -49,5 +53,32 @@ Route::prefix('v1')->group(function () {
         Route::post('/visits/{visit}/images', [ImageController::class, 'store']);
         Route::get('/visits/{visit}/images/{type}', [ImageController::class, 'show'])
             ->name('visits.images.show');
+    });
+
+    // -----------------------------------------------------------------
+    // Admin — Sanctum Bearer tokens
+    // -----------------------------------------------------------------
+    Route::prefix('admin')->group(function () {
+        // Public login — strict rate limit (10/hour/IP)
+        Route::post('/login', [AdminAuthController::class, 'login'])
+            ->middleware('throttle:admin-login');
+
+        // Authenticated admin endpoints
+        Route::middleware(['auth:sanctum', 'throttle:admin'])->group(function () {
+            Route::post('/logout', [AdminAuthController::class, 'logout']);
+            Route::get('/me', [AdminAuthController::class, 'me']);
+
+            // Visits
+            Route::get('/visits', [AdminVisitController::class, 'index']);
+            Route::get('/visits/{visit}', [AdminVisitController::class, 'show']);
+            Route::patch('/visits/{visit}/status', [AdminVisitController::class, 'updateStatus']);
+
+            // Stats
+            Route::get('/stats', [AdminStatsController::class, 'index']);
+
+            // Stations
+            Route::get('/stations', [AdminStationController::class, 'index']);
+            Route::post('/stations', [AdminStationController::class, 'store']);
+        });
     });
 });
