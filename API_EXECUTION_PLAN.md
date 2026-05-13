@@ -508,6 +508,212 @@ Sin librerías de terceros innecesarias. Menos dependencias = menos superficie d
 
 *Documento generado: Marzo 2026 — Visitor App Backend Plan · Laravel 12*
 
+---
+
+## 13. Requisitos del Servidor de Producción (Azure VM — Windows Server 2019 + IIS)
+
+> Ambiente real de producción: Azure VM con Windows Server 2019 Datacenter, IIS, MySQL.
+> Acceso restringido: solo dispositivos dentro de la VPN corporativa.
+> Esta sección lista todo lo que debe estar instalado y configurado en esa VM antes del deploy.
+
+### 13.1 Sistema operativo
+
+| Componente | Versión mínima | Notas |
+|---|---|---|
+| Windows Server | **2019 Datacenter** | Confirmado por IT. También compatible con 2022 |
+| Actualizaciones de Windows | Todas las críticas aplicadas | Antes de cualquier deploy |
+| Zona horaria | Configurada según operación (ej. America/El_Salvador) | Debe coincidir con `APP_TIMEZONE` del `.env` |
+
+### 13.2 IIS (Internet Information Services)
+
+| Feature / Módulo | Requerido | Para qué |
+|---|---|---|
+| Web Server (IIS) Role | ✅ | Servidor web |
+| **URL Rewrite Module 2.1** | ✅ obligatorio | Reescribe todas las URLs a `index.php` (equivalente a `mod_rewrite`) |
+| **CGI / FastCGI** | ✅ obligatorio | Necesario para ejecutar PHP |
+| Static Content | ✅ | Servir CSS/JS si en el futuro hubiera |
+| Default Document | ✅ | `index.php` |
+| HTTP Errors | ✅ | Páginas de error personalizadas |
+| **Request Filtering** | ✅ | Bloquea extensiones peligrosas (.env, .git, etc.) |
+| **IP and Domain Restrictions** | ⚙️ opcional | Reforzar acceso solo desde rangos de VPN |
+| **Dynamic Content Compression** | ⚙️ recomendado | Comprime respuestas JSON |
+| **Logging** | ✅ | Logs de IIS para auditoría |
+
+**Instalación:** PowerShell (como Administrador):
+```powershell
+Install-WindowsFeature -Name Web-Server, Web-CGI, Web-Common-Http, Web-Static-Content, Web-Default-Doc, Web-Http-Errors, Web-Filtering, Web-Dyn-Compression, Web-Http-Logging -IncludeManagementTools
+```
+
+**URL Rewrite Module** (no viene con IIS, descarga separada):
+- Microsoft Web Platform Installer, o
+- Descarga directa: https://www.iis.net/downloads/microsoft/url-rewrite
+
+### 13.3 PHP
+
+| Componente | Versión mínima | Recomendada | Notas |
+|---|---|---|---|
+| **PHP** | **8.2** (requerido por Laravel 12) | **8.3 LTS** o **8.4** | Build **Non-Thread-Safe x64** (NTS) — obligatorio para IIS+FastCGI |
+| Descarga | https://windows.php.net/download/ | | Elegir el VC16/VS17 x64 Non Thread Safe |
+| Ubicación recomendada | `C:\php\8.3\` | | Agregar a PATH del sistema |
+| `php.ini` | Copiar `php.ini-production` → `php.ini` | | Ajustes en sección 13.5 |
+
+**Extensiones PHP requeridas (habilitar en `php.ini`):**
+
+| Extensión | Para qué |
+|---|---|
+| `extension=bcmath` | Cálculos de precisión arbitraria (Laravel) |
+| `extension=ctype` | Validación de tipos de carácter |
+| `extension=curl` | Llamadas HTTP salientes |
+| `extension=fileinfo` | Detectar tipo MIME real de imágenes (seguridad) |
+| `extension=gd` *o* `extension=imagick` | Procesamiento de imágenes (Intervention/Image) |
+| `extension=mbstring` | Strings multibyte (UTF-8) |
+| `extension=mysqli` | Cliente MySQL |
+| `extension=openssl` | HTTPS, cifrado, tokens |
+| `extension=pdo_mysql` | Driver Eloquent para MySQL |
+| `extension=tokenizer` | Análisis de código (Composer) |
+| `extension=xml` | Procesamiento XML |
+| `extension=zip` | Composer, descarga de paquetes |
+| `extension=intl` | Internacionalización (recomendado) |
+| `extension=exif` | Lectura de metadatos EXIF de imágenes |
+
+### 13.4 Integración PHP ↔ IIS
+
+| Componente | Configuración |
+|---|---|
+| **Handler Mapping** | En IIS Manager → Handler Mappings → Add Module Mapping:<br>• Request path: `*.php`<br>• Module: `FastCgiModule`<br>• Executable: `C:\php\8.3\php-cgi.exe`<br>• Name: `PHP_via_FastCGI` |
+| **FastCGI Settings** | `Instance MaxRequests` = `10000`, `Activity Timeout` = `300` |
+| **Permisos de carpeta** | `IIS_IUSRS` con lectura en el proyecto + escritura en `storage/` y `bootstrap/cache/` |
+| **App Pool** | Identity = `ApplicationPoolIdentity`; .NET CLR = `No Managed Code`; Pipeline = `Integrated` |
+
+### 13.5 Ajustes `php.ini` recomendados para producción
+
+```ini
+expose_php = Off
+display_errors = Off
+display_startup_errors = Off
+log_errors = On
+error_log = C:\php\logs\php_errors.log
+
+memory_limit = 256M
+max_execution_time = 60
+max_input_time = 60
+
+post_max_size = 20M
+upload_max_filesize = 6M           ; 5 MB del plan + margen
+max_file_uploads = 5
+
+date.timezone = America/El_Salvador
+extension_dir = "C:\php\8.3\ext"
+
+cgi.fix_pathinfo = 0               ; seguridad: evita ejecución de archivos no-PHP
+session.cookie_secure = 1
+session.cookie_httponly = 1
+session.cookie_samesite = "Strict"
+```
+
+### 13.6 MySQL
+
+| Componente | Versión mínima | Recomendada | Notas |
+|---|---|---|---|
+| **MySQL Server** | **8.0** | **8.4 LTS** | Compatible con Eloquent y migraciones de Laravel 12 |
+| Instalador | MySQL Installer for Windows | | https://dev.mysql.com/downloads/installer/ |
+| Charset | `utf8mb4` | | Soporta emojis y caracteres internacionales |
+| Collation | `utf8mb4_unicode_ci` | | |
+| Storage Engine | InnoDB (default) | | Soporta foreign keys y transacciones |
+| Bind address | `127.0.0.1` | | Solo conexiones locales — la API y la BD viven en la misma VM |
+| Usuario de la app | NO usar `root` | Crear usuario dedicado | Ver script abajo |
+
+**Script de provisión de BD y usuario:**
+```sql
+CREATE DATABASE visitors_prod
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+CREATE USER 'visitors_app'@'localhost' IDENTIFIED BY 'PASSWORD_FUERTE_AQUI';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
+  ON visitors_prod.* TO 'visitors_app'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+> El usuario `visitors_app` **no tiene** permisos `DROP`, `GRANT` ni `SUPER` — limita el daño en caso de credencial comprometida.
+
+### 13.7 Composer
+
+| Componente | Versión mínima | Notas |
+|---|---|---|
+| **Composer** | **2.5+** | https://getcomposer.org/Composer-Setup.exe |
+| Ubicación | En PATH del sistema | Verificar con `composer --version` |
+
+### 13.8 Certificado SSL
+
+| Tipo | Recurso | Notas |
+|---|---|---|
+| Corporativo interno | CA interna de EFL Global | ✅ Recomendado — el servidor es solo VPN, no necesita certificado público |
+| Let's Encrypt (alternativa) | `win-acme` para IIS | Solo si el dominio interno es resolvible públicamente |
+| Auto-firmado | ⚠️ No recomendado | Las tablets Android tendrían que aceptar manualmente el certificado |
+
+**Importante:** El certificado SSL debe instalarse en el almacén `LocalMachine\Personal` y vincularse al sitio en IIS Bindings (puerto 443).
+
+### 13.9 Permisos del sistema de archivos
+
+| Carpeta del proyecto | Permisos |
+|---|---|
+| `C:\inetpub\visitors-api\` (raíz) | `IIS_IUSRS` → Lectura |
+| `C:\inetpub\visitors-api\storage\` | `IIS_IUSRS` → Lectura + Escritura |
+| `C:\inetpub\visitors-api\bootstrap\cache\` | `IIS_IUSRS` → Lectura + Escritura |
+| `C:\inetpub\visitors-api\storage\app\visitors\` | `IIS_IUSRS` → Lectura + Escritura (imágenes) |
+| `C:\inetpub\visitors-api\.env` | `IIS_IUSRS` → Solo Lectura |
+
+### 13.10 Firewall y red
+
+| Puerto | Dirección | Origen | Notas |
+|---|---|---|---|
+| **443/TCP** | Entrante | Rango VPN únicamente | HTTPS al API |
+| **80/TCP** | Entrante | Rango VPN | Solo para redirección 301 → HTTPS |
+| **3306/TCP** | Entrante | ❌ **Bloqueado** | MySQL no debe ser accesible desde la red, solo localhost |
+| **RDP/3389** | Entrante | Rango VPN admin | Administración remota |
+
+**Network Security Group (NSG) de Azure:** mismo criterio — solo permitir orígenes desde el rango de la VPN.
+
+### 13.11 Resumen — Checklist de provisión de la VM
+
+```
+[ ] Windows Server 2019 con últimas actualizaciones
+[ ] IIS instalado con módulos: CGI, URL Rewrite 2.1, Request Filtering, Compression
+[ ] PHP 8.3+ Non-Thread-Safe x64 en C:\php\8.3\
+[ ] PHP en PATH del sistema
+[ ] php.ini ajustado para producción (sección 13.5)
+[ ] Extensiones PHP habilitadas (sección 13.3)
+[ ] Composer 2.5+ instalado
+[ ] MySQL 8.0+ instalado, bind a 127.0.0.1
+[ ] Base de datos visitors_prod creada con utf8mb4
+[ ] Usuario visitors_app con permisos mínimos
+[ ] Handler FastCGI configurado en IIS
+[ ] Application Pool dedicado (No Managed Code, ApplicationPoolIdentity)
+[ ] Sitio IIS apuntando a C:\inetpub\visitors-api\public\
+[ ] Certificado SSL instalado y vinculado al sitio
+[ ] web.config en public/ con reglas de URL Rewrite a index.php
+[ ] Permisos NTFS en storage/ y bootstrap/cache/
+[ ] Firewall Windows + NSG Azure permitiendo solo VPN
+[ ] Backup automático de visitors_prod programado
+```
+
+### 13.12 Diferencias clave: Linux/Apache (dev) vs Windows/IIS (prod)
+
+| Tema | Linux + Apache (pruebas) | Windows Server + IIS (producción) |
+|---|---|---|
+| URL Rewrite | `.htaccess` (incluido en `public/`) | `web.config` con reglas URL Rewrite |
+| PHP build | Thread-safe (mod_php) o FPM | **Non-Thread-Safe** + FastCGI obligatorio |
+| Permisos | `www-data` user/group | `IIS_IUSRS` |
+| Logs | `/var/log/apache2/`, `storage/logs/` | `%SystemDrive%\inetpub\logs\LogFiles\`, `storage/logs/` |
+| Variables de entorno | `.env` (igual) | `.env` (igual) |
+| Certificado | Let's Encrypt + certbot | CA corporativa + IIS Bindings |
+| Cron / Schedule | crontab → `php artisan schedule:run` | Task Scheduler → `php artisan schedule:run` |
+| Queue worker (futuro) | systemd service | NSSM o Task Scheduler como servicio |
+
+> **El código del proyecto es idéntico en ambos entornos.** Solo cambian: el archivo de reescritura (`.htaccess` vs `web.config`) y el `.env`. Todo lo demás — controladores, servicios, migraciones — funciona igual.
+
+
 
 
 
