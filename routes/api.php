@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Api\V1\Admin\StationController as AdminStationController;
 use App\Http\Controllers\Api\V1\Admin\StatsController as AdminStatsController;
+use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\VisitController as AdminVisitController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ImageController;
@@ -79,6 +80,12 @@ Route::prefix('v1')->group(function () {
             // Stations
             Route::get('/stations', [AdminStationController::class, 'index']);
             Route::post('/stations', [AdminStationController::class, 'store']);
+
+            // Users (super_admin only — enforced inside the controller)
+            Route::get('/users', [AdminUserController::class, 'index']);
+            Route::post('/users', [AdminUserController::class, 'store']);
+            Route::patch('/users/{user}', [AdminUserController::class, 'update']);
+            Route::post('/users/{user}/revoke-tokens', [AdminUserController::class, 'revokeTokens']);
         });
     });
 });
