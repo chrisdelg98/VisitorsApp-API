@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateVisitStatusRequest;
 use App\Http\Resources\VisitResource;
 use App\Models\Visit;
+use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -79,6 +80,7 @@ class VisitController extends Controller
     public function updateStatus(UpdateVisitStatusRequest $request, Visit $visit): JsonResponse
     {
         $newStatus = $request->string('status')->value();
+        $previousStatus = $visit->status;
 
         $visit->status = $newStatus;
         if ($newStatus === 'completed' && $visit->check_out === null) {
@@ -88,6 +90,13 @@ class VisitController extends Controller
             $visit->check_out = null;
         }
         $visit->save();
+
+        AuditLogger::log('admin.visit.status_changed', $request, [
+            'visit_id'        => $visit->id,
+            'station_id'      => $visit->station_id,
+            'previous_status' => $previousStatus,
+            'new_status'      => $newStatus,
+        ]);
 
         return response()->json([
             'success' => true,

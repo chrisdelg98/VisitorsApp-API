@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminLoginRequest;
 use App\Models\User;
+use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -19,6 +21,11 @@ class AuthController extends Controller
         $user = User::where('email', $request->string('email'))->first();
 
         if (! $user || ! Hash::check($request->string('password'), $user->password)) {
+            AuditLogger::log('admin.login.failed', $request, [
+                'attempted_email' => (string) $request->string('email'),
+                'reason'          => $user ? 'wrong_password' : 'unknown_email',
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid credentials.',
@@ -27,6 +34,11 @@ class AuthController extends Controller
         }
 
         if (! $user->is_active) {
+            AuditLogger::log('admin.login.denied', $request, [
+                'attempted_email' => $user->email,
+                'reason'          => 'account_disabled',
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Account is disabled.',
@@ -38,6 +50,13 @@ class AuthController extends Controller
         $user->tokens()->delete();
 
         $token = $user->createToken('admin', ['admin'])->plainTextToken;
+
+        Log::channel('audit')->info('admin.login.success', [
+            'user_id'    => $user->id,
+            'user_email' => $user->email,
+            'ip'         => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -60,6 +79,8 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
+        AuditLogger::log('admin.logout', $request);
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

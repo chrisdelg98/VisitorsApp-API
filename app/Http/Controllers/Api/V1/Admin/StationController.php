@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreStationRequest;
 use App\Http\Resources\AdminStationResource;
 use App\Models\Station;
+use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 
@@ -34,6 +35,12 @@ class StationController extends Controller
             'code'      => $request->string('code'),
             'api_key'   => Str::random(64),
             'is_active' => $request->boolean('is_active', true),
+        ]);
+
+        AuditLogger::log('admin.station.created', $request, [
+            'station_id'   => $station->id,
+            'station_code' => (string) $station->code,
+            'station_name' => (string) $station->name,
         ]);
 
         return response()->json([
