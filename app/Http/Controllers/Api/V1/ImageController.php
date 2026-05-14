@@ -50,19 +50,12 @@ class ImageController extends Controller
 
     /**
      * GET /v1/visits/{visit}/images/{type} — stream the image bytes.
+     * Cross-station read: any authenticated station can download images of any visit.
+     * Required for the re-entry flow where Station B downloads photos from a visit
+     * originally created by Station A to pre-fill the confirmation modal.
      */
     public function show(Request $request, Visit $visit, string $type): StreamedResponse|JsonResponse
     {
-        $station = $request->attributes->get('station');
-
-        if ($visit->station_id !== $station->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'This visit does not belong to your station.',
-                'code'    => 'VISIT_FOREIGN_STATION',
-            ], 403);
-        }
-
         $image = VisitImage::where('visit_id', $visit->id)
             ->where('type', $type)
             ->first();

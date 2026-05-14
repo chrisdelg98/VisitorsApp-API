@@ -24,6 +24,8 @@ class Visit extends Model
         'status',
         'badge_printed',
         'notes',
+        'original_visit_id',
+        'reentry_from_station_id',
     ];
 
     protected $casts = [
@@ -45,5 +47,15 @@ class Visit extends Model
     public function images(): HasMany
     {
         return $this->hasMany(VisitImage::class);
+    }
+
+    public function originalVisit(): BelongsTo
+    {
+        return $this->belongsTo(Visit::class, 'original_visit_id');
+    }
+
+    public function reentryFromStation(): BelongsTo
+    {
+        return $this->belongsTo(Station::class, 'reentry_from_station_id');
     }
 }

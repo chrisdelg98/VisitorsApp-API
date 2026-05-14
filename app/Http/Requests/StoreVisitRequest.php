@@ -14,12 +14,15 @@ class StoreVisitRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'visitor_id'           => ['required', 'uuid', 'exists:visitors,id'],
-            'visitor_type'         => ['required', 'string', 'max:50'],
-            'visit_reason'         => ['required', 'string', 'max:100'],
-            'visit_reason_custom'  => ['nullable', 'required_if:visit_reason,Other', 'string', 'max:255'],
-            'visiting_person'      => ['required', 'string', 'max:150'],
-            'notes'                => ['nullable', 'string', 'max:2000'],
+            'visitor_id'              => ['required', 'uuid', 'exists:visitors,id'],
+            'visitor_type'            => ['required', 'string', 'max:50'],
+            'visit_reason'            => ['required', 'string', 'max:100'],
+            'visit_reason_custom'     => ['nullable', 'required_if:visit_reason,Other', 'string', 'max:255'],
+            'visiting_person'         => ['required', 'string', 'max:150'],
+            'notes'                   => ['nullable', 'string', 'max:2000'],
+            // Re-entry / cross-station fields (optional)
+            'original_visit_id'       => ['nullable', 'uuid', 'exists:visits,id'],
+            'reentry_from_station_id' => ['nullable', 'uuid', 'exists:stations,id'],
         ];
     }
 }
