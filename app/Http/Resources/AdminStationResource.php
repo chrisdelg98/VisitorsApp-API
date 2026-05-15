@@ -16,6 +16,7 @@ class AdminStationResource extends JsonResource
         return [
             'id'         => $this->id,
             'name'       => $this->name,
+            'location'   => $this->location,
             'code'       => $this->code,
             'api_key'    => $this->getAttribute('api_key'),
             'is_active'  => (bool) $this->is_active,

@@ -106,7 +106,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json([
                     'success' => false,
                     'message' => 'Too many requests. Please slow down.',
-                    'code'    => 'RATE_LIMIT_EXCEEDED',
+                    'code'    => 'RATE_LIMITED',
                 ], 429, $e->getHeaders());
             }
         });

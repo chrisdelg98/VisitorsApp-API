@@ -13,8 +13,10 @@ class Station extends Model
 
     protected $fillable = [
         'name',
+        'location',
         'code',
         'api_key',
+        'pin',
         'is_active',
     ];
 
@@ -24,6 +26,7 @@ class Station extends Model
 
     protected $hidden = [
         'api_key',
+        'pin',
     ];
 
     public function visits(): HasMany

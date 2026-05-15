@@ -1,0 +1,22 @@
+# Desactivar listado de directorios
+Options -Indexes
+
+RewriteEngine On
+
+# Permitir ACME challenge (AutoSSL)
+RewriteRule ^\.well-known/acme-challenge/ - [L]
+
+# Bloquear archivos ocultos EXCEPTO .well-known
+RewriteRule "(^|/)\.(?!well-known)" - [F]
+
+# Bloquear archivos sensibles
+<FilesMatch "\.(env|ini|log|conf|sql|bak|zip|tar|gz|sh|sftp|md|lock|json|xml)$">
+    Require all denied
+</FilesMatch>
+
+# Bloquear acceso directo a carpetas internas de Laravel
+RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|tests-manual|vendor|docs)(/|$) - [F,L]
+
+# Enrutar TODO lo demás al front controller de Laravel en public/
+RewriteCond %{REQUEST_URI} !^/public/
+RewriteRule ^(.*)$ public/$1 [L]

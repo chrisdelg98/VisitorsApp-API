@@ -31,9 +31,9 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureRateLimiters(): void
     {
-        // Public endpoint to exchange a station code for an API key — very strict.
-        RateLimiter::for('validate-station', function (Request $request) {
-            return Limit::perHour(5)->by($request->ip());
+        // Station authentication — exchange station_code+pin for api_key.
+        RateLimiter::for('station-auth', function (Request $request) {
+            return Limit::perMinutes(15, 5)->by($request->ip());
         });
 
         // Admin login — strict.

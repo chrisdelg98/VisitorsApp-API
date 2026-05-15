@@ -23,10 +23,10 @@ Route::get('/health', fn () => response()->json(['status' => 'ok']));
 
 Route::prefix('v1')->group(function () {
     // -----------------------------------------------------------------
-    // Public — strict rate limit (5/hour/IP)
+    // Public — strict rate limit (5/15min/IP)
     // -----------------------------------------------------------------
-    Route::post('/auth/validate-station', [AuthController::class, 'validateStation'])
-        ->middleware('throttle:validate-station');
+    Route::post('/auth/station', [AuthController::class, 'station'])
+        ->middleware('throttle:station-auth');
 
     // -----------------------------------------------------------------
     // Tablet endpoints — require valid X-API-Key

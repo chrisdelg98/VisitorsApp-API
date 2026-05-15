@@ -8,6 +8,7 @@ use App\Http\Resources\AdminStationResource;
 use App\Models\Station;
 use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class StationController extends Controller
@@ -32,8 +33,10 @@ class StationController extends Controller
     {
         $station = Station::create([
             'name'      => $request->string('name'),
+            'location'  => $request->string('location') ?: null,
             'code'      => $request->string('code'),
             'api_key'   => Str::random(64),
+            'pin'       => Hash::make($request->string('pin')),
             'is_active' => $request->boolean('is_active', true),
         ]);
 
