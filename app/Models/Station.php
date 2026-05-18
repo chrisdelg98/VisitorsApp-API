@@ -62,7 +62,7 @@ class Station extends Model
             return;
         }
 
-        StationDeviceLog::create([
+        $snapshot = [
             'station_id'        => $this->id,
             'device_imei'       => $this->device_imei,
             'device_android_id' => $this->device_android_id,
@@ -70,8 +70,9 @@ class Station extends Model
             'registered_ip'     => $this->registered_ip,
             'registered_at'     => $this->registered_at,
             'unregistered_by'   => $by,
-        ]);
+        ];
 
+        // Clear first — logout must always succeed even if the log table is missing
         $this->update([
             'device_imei'       => null,
             'device_android_id' => null,
@@ -79,5 +80,11 @@ class Station extends Model
             'registered_ip'     => null,
             'registered_at'     => null,
         ]);
+
+        try {
+            StationDeviceLog::create($snapshot);
+        } catch (\Throwable) {
+            // Non-critical — registration is already cleared above
+        }
     }
 }
