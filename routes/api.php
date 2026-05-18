@@ -33,6 +33,7 @@ Route::prefix('v1')->group(function () {
     // -----------------------------------------------------------------
     Route::middleware(['api.key', 'throttle:api'])->group(function () {
         Route::get('/station/me', [StationController::class, 'me']);
+        Route::post('/station/logout', [StationController::class, 'logout']);
 
         // Visitors
         Route::get('/visitors/search', [VisitorController::class, 'search']);
@@ -80,6 +81,7 @@ Route::prefix('v1')->group(function () {
             // Stations
             Route::get('/stations', [AdminStationController::class, 'index']);
             Route::post('/stations', [AdminStationController::class, 'store']);
+            Route::post('/stations/{station}/reset-device', [AdminStationController::class, 'resetDevice']);
 
             // Users (super_admin only — enforced inside the controller)
             Route::get('/users', [AdminUserController::class, 'index']);

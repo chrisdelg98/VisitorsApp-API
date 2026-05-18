@@ -46,4 +46,38 @@ class Station extends Model
     {
         return $this->hasMany(Visit::class);
     }
+
+    public function deviceLogs(): HasMany
+    {
+        return $this->hasMany(StationDeviceLog::class)->latest();
+    }
+
+    /**
+     * Save current device data to log and clear device registration.
+     * $by: 'device_logout' | 'admin_reset'
+     */
+    public function unregisterDevice(string $by): void
+    {
+        if ($this->registered_at === null) {
+            return;
+        }
+
+        StationDeviceLog::create([
+            'station_id'        => $this->id,
+            'device_imei'       => $this->device_imei,
+            'device_android_id' => $this->device_android_id,
+            'device_model'      => $this->device_model,
+            'registered_ip'     => $this->registered_ip,
+            'registered_at'     => $this->registered_at,
+            'unregistered_by'   => $by,
+        ]);
+
+        $this->update([
+            'device_imei'       => null,
+            'device_android_id' => null,
+            'device_model'      => null,
+            'registered_ip'     => null,
+            'registered_at'     => null,
+        ]);
+    }
 }

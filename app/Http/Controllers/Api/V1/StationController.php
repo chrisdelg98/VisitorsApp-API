@@ -21,4 +21,19 @@ class StationController extends Controller
             'data'    => new StationResource($station),
         ]);
     }
+
+    /**
+     * POST /v1/station/logout
+     * Tablet logs out manually — clears device registration so the PIN can be used again.
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $station = $request->attributes->get('station');
+        $station->unregisterDevice('device_logout');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Station logged out. PIN can now be used to register a new device.',
+        ]);
+    }
 }

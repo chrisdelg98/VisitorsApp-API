@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Station authentication — exchange station_code+pin for api_key.
         RateLimiter::for('station-auth', function (Request $request) {
-            return Limit::perMinutes(15, 5)->by($request->ip());
+            return Limit::perMinutes(10, 10)->by($request->ip());
         });
 
         // Admin login — strict.
