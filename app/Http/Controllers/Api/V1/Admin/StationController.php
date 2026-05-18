@@ -31,13 +31,16 @@ class StationController extends Controller
      */
     public function store(StoreStationRequest $request): JsonResponse
     {
+        $pin = (string) $request->string('pin');
+
         $station = Station::create([
-            'name'      => $request->string('name'),
-            'location'  => $request->string('location') ?: null,
-            'code'      => $request->string('code'),
-            'api_key'   => Str::random(64),
-            'pin'       => Hash::make($request->string('pin')),
-            'is_active' => $request->boolean('is_active', true),
+            'name'       => $request->string('name'),
+            'location'   => $request->string('location') ?: null,
+            'code'       => $request->string('code'),
+            'api_key'    => Str::random(64),
+            'pin'        => Hash::make($pin),
+            'pin_lookup' => Station::makePinLookup($pin),
+            'is_active'  => $request->boolean('is_active', true),
         ]);
 
         AuditLogger::log('admin.station.created', $request, [

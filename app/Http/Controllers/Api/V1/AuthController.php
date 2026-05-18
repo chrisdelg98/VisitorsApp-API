@@ -6,33 +6,45 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StationAuthRequest;
 use App\Models\Station;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
     /**
      * POST /v1/auth/station
-     * Exchange station_code + pin for the station's api_key.
-     * Public endpoint — protected by strict rate limit (5/15 min/IP).
-     * This is the ONLY endpoint that emits api_key; no X-API-Key required here.
+     * Activate a tablet by PIN. One-time registration per station.
+     * Public — protected by strict rate limit (5/15 min/IP).
      */
     public function station(StationAuthRequest $request): JsonResponse
     {
-        $station = Station::where('code', $request->string('station_code'))
+        $lookup = Station::makePinLookup($request->string('pin'));
+
+        $station = Station::where('pin_lookup', $lookup)
             ->where('is_active', true)
             ->first();
 
-        // Always check both code and pin before rejecting — avoids leaking which
-        // field is wrong (security: timing-safe failure).
-        $pinValid = $station && $station->pin && Hash::check($request->string('pin'), $station->pin);
-
-        if (! $pinValid) {
+        if (! $station) {
             return response()->json([
                 'success' => false,
-                'message' => 'Station code or PIN is invalid.',
+                'message' => 'PIN is invalid or station is inactive.',
                 'code'    => 'STATION_INVALID',
             ], 401);
         }
+
+        if ($station->registered_at !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This station is already registered to a device. Contact your administrator to reset it.',
+                'code'    => 'STATION_ALREADY_REGISTERED',
+            ], 401);
+        }
+
+        $station->update([
+            'device_imei'       => $request->string('device_imei') ?: null,
+            'device_android_id' => $request->string('device_android_id') ?: null,
+            'device_model'      => $request->string('device_model') ?: null,
+            'registered_ip'     => $request->string('device_ip') ?: $request->ip(),
+            'registered_at'     => now(),
+        ]);
 
         return response()->json([
             'success' => true,

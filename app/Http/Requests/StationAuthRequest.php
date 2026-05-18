@@ -14,8 +14,11 @@ class StationAuthRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'station_code' => ['required', 'string', 'max:20'],
-            'pin'          => ['required', 'string', 'min:4', 'max:20'],
+            'pin'               => ['required', 'string', 'digits:8'],
+            'device_imei'       => ['nullable', 'string', 'max:20'],
+            'device_android_id' => ['nullable', 'string', 'max:64'],
+            'device_model'      => ['nullable', 'string', 'max:100'],
+            'device_ip'         => ['nullable', 'ip'],
         ];
     }
 }
