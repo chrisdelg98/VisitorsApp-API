@@ -24,6 +24,12 @@ class StatsController extends Controller
         $base = Visit::query()
             ->whereBetween('check_in', [$from, $to]);
 
+        if ($request->filled('country_id')) {
+            $base->whereHas('station', fn ($q) =>
+                $q->where('country_id', $request->string('country_id'))
+            );
+        }
+
         $totals = [
             'total'     => (clone $base)->count(),
             'active'    => (clone $base)->where('status', 'active')->count(),

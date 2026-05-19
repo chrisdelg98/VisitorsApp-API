@@ -19,6 +19,7 @@ class User extends Authenticatable
         'password',
         'role',
         'is_active',
+        'country_id',
     ];
 
     protected $hidden = [
@@ -35,8 +36,18 @@ class User extends Authenticatable
         ];
     }
 
+    public function country(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Country::class);
+    }
+
     public function isSuperAdmin(): bool
     {
         return $this->role === 'super_admin';
+    }
+
+    public function hasCountryScope(): bool
+    {
+        return in_array($this->role, ['country_manager', 'viewer']) && $this->country_id !== null;
     }
 }

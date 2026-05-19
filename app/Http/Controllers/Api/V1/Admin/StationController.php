@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreStationRequest;
 use App\Http\Resources\AdminStationResource;
+use App\Http\Resources\StationDeviceLogResource;
 use App\Models\Station;
 use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
@@ -55,6 +56,19 @@ class StationController extends Controller
             'message' => 'Station created successfully.',
             'data'    => new AdminStationResource($station),
         ], 201);
+    }
+
+    /**
+     * GET /v1/admin/stations/{station}/device-logs — history of devices registered to this station.
+     */
+    public function deviceLogs(Station $station): JsonResponse
+    {
+        $logs = $station->deviceLogs()->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => StationDeviceLogResource::collection($logs),
+        ]);
     }
 
     /**

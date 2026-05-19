@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Api\V1\Admin\CountryController as AdminCountryController;
 use App\Http\Controllers\Api\V1\Admin\StationController as AdminStationController;
 use App\Http\Controllers\Api\V1\Admin\StatsController as AdminStatsController;
 use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
@@ -78,10 +79,14 @@ Route::prefix('v1')->group(function () {
             // Stats
             Route::get('/stats', [AdminStatsController::class, 'index']);
 
+            // Countries
+            Route::get('/countries', [AdminCountryController::class, 'index']);
+
             // Stations
             Route::get('/stations', [AdminStationController::class, 'index']);
             Route::post('/stations', [AdminStationController::class, 'store']);
             Route::post('/stations/{station}/reset-device', [AdminStationController::class, 'resetDevice']);
+            Route::get('/stations/{station}/device-logs', [AdminStationController::class, 'deviceLogs']);
 
             // Users (super_admin only — enforced inside the controller)
             Route::get('/users', [AdminUserController::class, 'index']);

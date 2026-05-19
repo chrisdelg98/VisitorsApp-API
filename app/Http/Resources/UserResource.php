@@ -14,6 +14,8 @@ class UserResource extends JsonResource
             'name'            => $this->name,
             'email'           => $this->email,
             'role'            => $this->role,
+            'country'         => $this->whenLoaded('country', fn () => new CountryResource($this->country)),
+            'country_id'      => $this->country_id,
             'is_active'       => (bool) $this->is_active,
             'active_sessions' => $this->whenCounted('tokens'),
             'created_at'      => $this->created_at?->toIso8601String(),

@@ -39,7 +39,7 @@ class UserController extends Controller
             return $block;
         }
 
-        $users = User::withCount('tokens')->orderBy('name')->get();
+        $users = User::with('country')->withCount('tokens')->orderBy('name')->get();
 
         return response()->json([
             'success' => true,
@@ -57,11 +57,12 @@ class UserController extends Controller
         }
 
         $user = User::create([
-            'name'      => (string) $request->string('name'),
-            'email'     => (string) $request->string('email'),
-            'password'  => (string) $request->string('password'),
-            'role'      => (string) $request->string('role'),
-            'is_active' => $request->boolean('is_active', true),
+            'name'       => (string) $request->string('name'),
+            'email'      => (string) $request->string('email'),
+            'password'   => (string) $request->string('password'),
+            'role'       => (string) $request->string('role'),
+            'country_id' => $request->input('country_id'),
+            'is_active'  => $request->boolean('is_active', true),
         ]);
 
         AuditLogger::log('admin.user.created', $request, [
@@ -108,7 +109,7 @@ class UserController extends Controller
             }
         }
 
-        $changes = $request->only(['name', 'email', 'role', 'is_active']);
+        $changes = $request->only(['name', 'email', 'role', 'country_id', 'is_active']);
         if ($request->filled('password')) {
             $changes['password'] = (string) $request->string('password');
         }

@@ -14,6 +14,9 @@ class Station extends Model
     protected $fillable = [
         'name',
         'location',
+        'country_id',
+        'latitude',
+        'longitude',
         'code',
         'api_key',
         'pin',
@@ -39,7 +42,12 @@ class Station extends Model
 
     public static function makePinLookup(string $pin): string
     {
-        return hash_hmac('sha256', $pin, config('app.key'));
+        return hash_hmac('sha256', $pin, (string) config('app.key'));
+    }
+
+    public function country(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Country::class);
     }
 
     public function visits(): HasMany

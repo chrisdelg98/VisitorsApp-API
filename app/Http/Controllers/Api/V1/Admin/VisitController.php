@@ -22,7 +22,13 @@ class VisitController extends Controller
         $perPage = (int) $request->integer('per_page', 25);
         $perPage = max(1, min($perPage, 100));
 
-        $query = Visit::query()->with(['visitor', 'station']);
+        $query = Visit::query()->with(['visitor', 'station.country']);
+
+        if ($request->filled('country_id')) {
+            $query->whereHas('station', fn ($q) =>
+                $q->where('country_id', $request->string('country_id'))
+            );
+        }
 
         if ($request->filled('station_id')) {
             $query->where('station_id', $request->string('station_id'));

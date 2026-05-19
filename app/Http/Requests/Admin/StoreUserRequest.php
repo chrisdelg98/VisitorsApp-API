@@ -15,11 +15,17 @@ class StoreUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'      => ['required', 'string', 'max:150'],
-            'email'     => ['required', 'email', 'max:191', 'unique:users,email'],
-            'password'  => ['required', 'string', 'min:8', 'max:191'],
-            'role'      => ['required', Rule::in(['admin', 'super_admin'])],
-            'is_active' => ['sometimes', 'boolean'],
+            'name'       => ['required', 'string', 'max:150'],
+            'email'      => ['required', 'email', 'max:191', 'unique:users,email'],
+            'password'   => ['required', 'string', 'min:8', 'max:191'],
+            'role'       => ['required', Rule::in(['admin', 'super_admin', 'country_manager', 'viewer'])],
+            'country_id' => [
+                Rule::requiredIf(fn () => in_array($this->input('role'), ['country_manager', 'viewer'])),
+                'nullable',
+                'uuid',
+                'exists:countries,id',
+            ],
+            'is_active'  => ['sometimes', 'boolean'],
         ];
     }
 }
