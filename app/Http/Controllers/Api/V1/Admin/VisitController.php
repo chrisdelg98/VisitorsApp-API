@@ -89,11 +89,15 @@ class VisitController extends Controller
         $previousStatus = $visit->status;
 
         $visit->status = $newStatus;
-        if ($newStatus === 'completed' && $visit->check_out === null) {
-            $visit->check_out = now();
+        if ($newStatus === 'completed') {
+            if ($visit->check_out === null) {
+                $visit->check_out = now();
+            }
+            $visit->checkout_type = 'admin';
         }
         if ($newStatus === 'active') {
             $visit->check_out = null;
+            $visit->checkout_type = null;
         }
         $visit->save();
 

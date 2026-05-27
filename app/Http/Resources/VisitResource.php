@@ -20,11 +20,14 @@ class VisitResource extends JsonResource
             'check_in'                => $this->check_in?->toIso8601String(),
             'check_out'               => $this->check_out?->toIso8601String(),
             'status'                  => $this->status,
+            'checkout_type'           => $this->checkout_type,
             'badge_printed'           => (bool) $this->badge_printed,
             'notes'                   => $this->notes,
             // Re-entry traceability (null for regular visits)
             'original_visit_id'       => $this->original_visit_id,
             'reentry_from_station_id' => $this->reentry_from_station_id,
+            'reentry_count'           => (int) $this->reentry_count,
+            'last_reentry_at'         => $this->last_reentry_at?->toIso8601String(),
             // Relations (loaded on demand)
             'visitor'                 => new VisitorResource($this->whenLoaded('visitor')),
             'station'                 => new StationResource($this->whenLoaded('station')),

@@ -46,6 +46,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/visits', [VisitController::class, 'store']);
         Route::get('/visits/active', [VisitController::class, 'active']);
         Route::patch('/visits/{visit}/checkout', [VisitController::class, 'checkout']);
+        Route::patch('/visits/{visit}/reentry', [VisitController::class, 'reentry']);
         Route::get('/visits/{visit}', [VisitController::class, 'show']);
     });
 

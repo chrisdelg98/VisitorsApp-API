@@ -26,12 +26,17 @@ class Visit extends Model
         'notes',
         'original_visit_id',
         'reentry_from_station_id',
+        'reentry_count',
+        'last_reentry_at',
+        'checkout_type',
     ];
 
     protected $casts = [
         'check_in' => 'datetime',
         'check_out' => 'datetime',
         'badge_printed' => 'boolean',
+        'last_reentry_at' => 'datetime',
+        'reentry_count' => 'integer',
     ];
 
     public function station(): BelongsTo
