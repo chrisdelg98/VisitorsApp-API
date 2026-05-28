@@ -14,6 +14,7 @@ class CountryResource extends JsonResource
             'name'       => $this->name,
             'code'       => $this->code,
             'flag_emoji' => $this->flag_emoji,
+            'timezone'   => $this->timezone,
             'is_active'  => (bool) $this->is_active,
         ];
     }
