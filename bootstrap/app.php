@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AutoCloseStaleVisits;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\ValidateApiKey;
@@ -31,7 +32,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Route-level aliases.
         $middleware->alias([
-            'api.key' => ValidateApiKey::class,
+            'api.key'            => ValidateApiKey::class,
+            'auto-close-visits'  => AutoCloseStaleVisits::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

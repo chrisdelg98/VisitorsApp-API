@@ -32,7 +32,7 @@ Route::prefix('v1')->group(function () {
     // -----------------------------------------------------------------
     // Tablet endpoints — require valid X-API-Key
     // -----------------------------------------------------------------
-    Route::middleware(['api.key', 'throttle:api'])->group(function () {
+    Route::middleware(['api.key', 'throttle:api', 'auto-close-visits'])->group(function () {
         Route::get('/station/me', [StationController::class, 'me']);
         Route::post('/station/logout', [StationController::class, 'logout']);
 
