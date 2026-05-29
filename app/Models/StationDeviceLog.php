@@ -18,10 +18,12 @@ class StationDeviceLog extends Model
         'registered_ip',
         'registered_at',
         'unregistered_by',
+        'unregistered_at',
     ];
 
     protected $casts = [
-        'registered_at' => 'datetime',
+        'registered_at'   => 'datetime',
+        'unregistered_at' => 'datetime',
     ];
 
     public function station(): BelongsTo

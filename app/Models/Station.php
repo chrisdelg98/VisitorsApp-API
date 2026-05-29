@@ -78,6 +78,7 @@ class Station extends Model
             'registered_ip'     => $this->registered_ip,
             'registered_at'     => $this->registered_at,
             'unregistered_by'   => $by,
+            'unregistered_at'   => now(),
         ];
 
         // Clear first — logout must always succeed even if the log table is missing

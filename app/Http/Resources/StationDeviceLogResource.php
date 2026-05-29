@@ -17,6 +17,7 @@ class StationDeviceLogResource extends JsonResource
             'registered_ip'     => $this->registered_ip,
             'registered_at'     => $this->registered_at?->toIso8601String(),
             'unregistered_by'   => $this->unregistered_by,
+            'unregistered_at'   => $this->unregistered_at?->toIso8601String(),
             'created_at'        => $this->created_at?->toIso8601String(),
         ];
     }
