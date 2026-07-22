@@ -100,6 +100,8 @@ Full reference with request/response bodies → [`docs/API.md`](docs/API.md)
 | `PATCH` | `/visits/{id}/checkout` | Check-out |
 | `POST` | `/visits/{id}/images` | Upload photo / document (multipart, max 5 MB) |
 | `GET` | `/visits/{id}/images/{type}` | Stream image bytes |
+| `GET` | `/ocr/templates` | Full published OCR template catalog (ETag → `304`) |
+| `POST` | `/ocr/failed-documents` | Report an unreadable document for review |
 
 ### Admin endpoints (`Authorization: Bearer <token>`)
 
@@ -146,6 +148,7 @@ Full reference with request/response bodies → [`docs/API.md`](docs/API.md)
 | `POST /admin/login` | 10 / hour / IP |
 | Tablet JSON endpoints | 120 / min / station |
 | Image uploads | 30 / min / station |
+| `POST /ocr/failed-documents` | 20 / min / station |
 | Admin endpoints | 200 / min / user |
 
 Exceeding any limit returns `429 RATE_LIMIT_EXCEEDED` with a `Retry-After` header.
@@ -156,7 +159,9 @@ Exceeding any limit returns `429 RATE_LIMIT_EXCEEDED` with a `Retry-After` heade
 
 All sensitive admin actions are written to `storage/logs/audit-YYYY-MM-DD.log` (daily rotation, 90-day retention configurable via `LOG_AUDIT_DAYS` env).
 
-Logged events: `admin.login.success/failed/denied`, `admin.logout`, `admin.visit.status_changed`, `admin.station.created`, `admin.user.created/updated/tokens_revoked`.
+Logged events: `admin.login.success/failed/denied`, `admin.logout`, `admin.visit.status_changed`, `admin.station.created`, `admin.user.created/updated/tokens_revoked`, `tablet.visit.reentry/reentry_created/cross_station_lookup`, `tablet.ocr.catalog_synced`, `tablet.ocr.failed_document_reported`, `system.ocr.retention_purge`.
+
+OCR entries never carry the reported content itself (`ocr_text` / `ocr_blocks` are PII) — only the row id and whether text/image were attached.
 
 Each entry includes: `user_id`, `user_email`, `ip`, `user_agent`, and action-specific context fields.
 
@@ -197,7 +202,15 @@ APP_URL=https://your-server
 FILESYSTEM_DISK=local
 
 LOG_AUDIT_DAYS=90
+
+# OCR review-queue retention (personal data) — see config/ocr.php
+OCR_FAILED_TEXT_RETENTION_DAYS=15
+OCR_FAILED_RESOLVED_RETENTION_DAYS=30
+OCR_FAILED_RETENTION_DAYS=90
 ```
+
+The retention job runs daily at 03:15 via the scheduler, so the server must run
+`php artisan schedule:run` every minute (cron / Task Scheduler).
 
 The seeder creates a default `super_admin` — **change the password before going to production**.
 

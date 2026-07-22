@@ -43,4 +43,17 @@ class ImageService
             'file_hash' => $hash,
         ]);
     }
+
+    /**
+     * Store the sample image of an unreadable document on the private disk and
+     * return its path. Same disk and layout as visit images: never public, only
+     * readable through an authenticated endpoint.
+     */
+    public function storeOcrSample(string $failedDocumentId, UploadedFile $file): string
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
+        $filename  = Str::uuid()->toString().'.'.$extension;
+
+        return $file->storeAs('ocr-failed/'.$failedDocumentId, $filename, 'local');
+    }
 }

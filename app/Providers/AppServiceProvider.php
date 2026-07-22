@@ -57,6 +57,15 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by($key);
         });
 
+        // OCR failure reports from tablets — shares the upload profile but is
+        // declared separately so it can be tuned without touching image uploads.
+        RateLimiter::for('ocr-reports', function (Request $request) {
+            $station = $request->attributes->get('station');
+            $key = $station?->id ?? $request->ip();
+
+            return Limit::perMinute(20)->by($key);
+        });
+
         // Authenticated admin panel.
         RateLimiter::for('admin', function (Request $request) {
             $key = $request->user()?->id ?? $request->ip();

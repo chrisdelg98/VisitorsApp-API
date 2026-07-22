@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\VisitController as AdminVisitController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ImageController;
+use App\Http\Controllers\Api\V1\OcrFailedDocumentController;
+use App\Http\Controllers\Api\V1\OcrTemplateController;
 use App\Http\Controllers\Api\V1\StationController;
 use App\Http\Controllers\Api\V1\VisitController;
 use App\Http\Controllers\Api\V1\VisitorController;
@@ -48,6 +50,16 @@ Route::prefix('v1')->group(function () {
         Route::patch('/visits/{visit}/checkout', [VisitController::class, 'checkout']);
         Route::patch('/visits/{visit}/reentry', [VisitController::class, 'reentry']);
         Route::get('/visits/{visit}', [VisitController::class, 'show']);
+
+        // OCR template catalog — full snapshot, conditional via ETag/If-None-Match.
+        Route::get('/ocr/templates', [OcrTemplateController::class, 'index']);
+    });
+
+    // -----------------------------------------------------------------
+    // OCR failure reports — same auth, own rate limiter (20/min/station)
+    // -----------------------------------------------------------------
+    Route::middleware(['api.key', 'throttle:ocr-reports'])->group(function () {
+        Route::post('/ocr/failed-documents', [OcrFailedDocumentController::class, 'store']);
     });
 
     // -----------------------------------------------------------------
