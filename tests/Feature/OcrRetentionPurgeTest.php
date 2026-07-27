@@ -23,8 +23,9 @@ class OcrRetentionPurgeTest extends TestCase
 
     public function test_old_pending_rows_lose_their_pii_but_keep_the_blocks(): void
     {
-        Storage::fake('local');
-        Storage::disk('local')->put('ocr-failed/sample.jpg', 'bytes');
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::fake('local');
+        $disk->put('ocr-failed/sample.jpg', 'bytes');
 
         $row = $this->report([
             'ocr_text' => 'JUAN PEREZ',
@@ -40,7 +41,7 @@ class OcrRetentionPurgeTest extends TestCase
         $this->assertNull($row->extracted_fields);
         $this->assertNull($row->image_path);
         $this->assertNotNull($row->ocr_blocks);
-        Storage::disk('local')->assertMissing('ocr-failed/sample.jpg');
+        $disk->assertMissing('ocr-failed/sample.jpg');
     }
 
     public function test_resolved_rows_are_deleted_after_the_short_window(): void
