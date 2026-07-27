@@ -27,4 +27,19 @@ return [
 
     'text_retention_days' => (int) env('OCR_FAILED_TEXT_RETENTION_DAYS', 15),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Front-side acceptance threshold
+    |--------------------------------------------------------------------------
+    |
+    | A report is only queued when the FRONT classifier confidence is at least
+    | this value (0..1). The back side has no templates yet, so it always scores
+    | low and is never used to gate acceptance. This trims the flood of unusable
+    | low-confidence reports. Reports below the threshold get a 200 response with
+    | `stored: false` (no row is written, so the device does not retry).
+    |
+    */
+
+    'min_front_confidence' => (float) env('OCR_MIN_FRONT_CONFIDENCE', 0.20),
+
 ];

@@ -45,14 +45,15 @@ class ImageService
     }
 
     /**
-     * Store the sample image of an unreadable document on the private disk and
+     * Store a sample image of an unreadable document on the private disk and
      * return its path. Same disk and layout as visit images: never public, only
-     * readable through an authenticated endpoint.
+     * readable through an authenticated endpoint. `$side` (front|back) prefixes
+     * the filename so both sides can live under the same report folder.
      */
-    public function storeOcrSample(string $failedDocumentId, UploadedFile $file): string
+    public function storeOcrSample(string $failedDocumentId, UploadedFile $file, string $side = 'front'): string
     {
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
-        $filename  = Str::uuid()->toString().'.'.$extension;
+        $filename  = $side.'-'.Str::uuid()->toString().'.'.$extension;
 
         return $file->storeAs('ocr-failed/'.$failedDocumentId, $filename, 'local');
     }

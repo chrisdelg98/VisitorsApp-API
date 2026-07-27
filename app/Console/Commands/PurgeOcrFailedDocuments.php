@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Storage;
  * Data-retention job for the OCR review queue.
  *
  * Three passes, from least to most destructive:
- *   1. minimize — drop ocr_text and the sample image from rows still in the
- *      queue past `text_retention_days`, keeping the structured ocr_blocks.
+ *   1. minimize — drop ocr_text, the app's extracted_fields and the sample
+ *      image from rows still in the queue past `text_retention_days`, keeping
+ *      the structured ocr_blocks.
  *   2. resolved — delete converted/discarded rows past `resolved_retention_days`.
  *   3. expired  — delete anything past `retention_days`, reviewed or not.
  */
@@ -64,7 +65,10 @@ class PurgeOcrFailedDocuments extends Command
             ->whereIn('status', ['pending', 'in_review'])
             ->where('created_at', '<', $cutoff)
             ->where(function ($q) {
-                $q->whereNotNull('ocr_text')->orWhereNotNull('image_path');
+                $q->whereNotNull('ocr_text')
+                    ->orWhereNotNull('extracted_fields')
+                    ->orWhereNotNull('image_path')
+                    ->orWhereNotNull('image_back_path');
             });
 
         if ($dryRun) {
@@ -76,7 +80,12 @@ class PurgeOcrFailedDocuments extends Command
         $query->chunkById(200, function ($rows) use (&$count) {
             foreach ($rows as $row) {
                 $this->deleteImage($row);
-                $row->update(['ocr_text' => null, 'image_path' => null]);
+                $row->update([
+                    'ocr_text'         => null,
+                    'extracted_fields' => null,
+                    'image_path'       => null,
+                    'image_back_path'  => null,
+                ]);
                 $count++;
             }
         });
@@ -114,8 +123,10 @@ class PurgeOcrFailedDocuments extends Command
 
     private function deleteImage(OcrFailedDocument $row): void
     {
-        if ($row->image_path) {
-            Storage::disk('local')->delete($row->image_path);
+        foreach ([$row->image_path, $row->image_back_path] as $path) {
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
         }
     }
 }

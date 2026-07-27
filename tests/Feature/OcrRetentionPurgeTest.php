@@ -28,6 +28,7 @@ class OcrRetentionPurgeTest extends TestCase
 
         $row = $this->report([
             'ocr_text' => 'JUAN PEREZ',
+            'extracted_fields' => ['first_name' => 'JUAN', 'last_name' => 'PEREZ'],
             'image_path' => 'ocr-failed/sample.jpg',
         ]);
         $row->forceFill(['created_at' => now()->subDays(20)])->save();
@@ -36,6 +37,7 @@ class OcrRetentionPurgeTest extends TestCase
 
         $row->refresh();
         $this->assertNull($row->ocr_text);
+        $this->assertNull($row->extracted_fields);
         $this->assertNull($row->image_path);
         $this->assertNotNull($row->ocr_blocks);
         Storage::disk('local')->assertMissing('ocr-failed/sample.jpg');

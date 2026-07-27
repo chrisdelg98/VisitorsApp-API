@@ -20,9 +20,12 @@ class OcrFailedDocument extends Model
         'station_id',
         'detected_type',
         'detected_confidence',
+        'match_score',
         'ocr_blocks',
         'ocr_text',
+        'extracted_fields',
         'image_path',
+        'image_back_path',
         'app_version',
         'status',
         'matched_template_id',
@@ -31,16 +34,21 @@ class OcrFailedDocument extends Model
 
     protected $casts = [
         'ocr_blocks'          => 'array',
+        'extracted_fields'    => 'array',
         'detected_confidence' => 'decimal:3',
+        'match_score'         => 'decimal:3',
     ];
 
     /**
-     * Never leak the raw storage path or the OCR text through a JSON response;
-     * both are only meant to be read server-side by the portal.
+     * Never leak PII or raw storage paths through a JSON response — the image
+     * paths, the OCR text and the app's structured reading (which holds the
+     * actual values read off the document) are only for the portal, server-side.
      */
     protected $hidden = [
         'image_path',
+        'image_back_path',
         'ocr_text',
+        'extracted_fields',
     ];
 
     public function station(): BelongsTo

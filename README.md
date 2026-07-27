@@ -159,9 +159,9 @@ Exceeding any limit returns `429 RATE_LIMIT_EXCEEDED` with a `Retry-After` heade
 
 All sensitive admin actions are written to `storage/logs/audit-YYYY-MM-DD.log` (daily rotation, 90-day retention configurable via `LOG_AUDIT_DAYS` env).
 
-Logged events: `admin.login.success/failed/denied`, `admin.logout`, `admin.visit.status_changed`, `admin.station.created`, `admin.user.created/updated/tokens_revoked`, `tablet.visit.reentry/reentry_created/cross_station_lookup`, `tablet.ocr.catalog_synced`, `tablet.ocr.failed_document_reported`, `system.ocr.retention_purge`.
+Logged events: `admin.login.success/failed/denied`, `admin.logout`, `admin.visit.status_changed`, `admin.station.created`, `admin.user.created/updated/tokens_revoked`, `tablet.visit.reentry/reentry_created/cross_station_lookup`, `tablet.ocr.catalog_synced`, `tablet.ocr.failed_document_reported`, `tablet.ocr.failed_document_skipped`, `system.ocr.retention_purge`.
 
-OCR entries never carry the reported content itself (`ocr_text` / `ocr_blocks` are PII) — only the row id and whether text/image were attached.
+OCR entries never carry the reported content itself (`ocr_text`, `ocr_blocks` and the app's `extracted_fields` are PII) — only the row id, scores, and whether text/reading/image were attached.
 
 Each entry includes: `user_id`, `user_email`, `ip`, `user_agent`, and action-specific context fields.
 
