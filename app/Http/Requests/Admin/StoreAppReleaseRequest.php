@@ -2,10 +2,22 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Services\AppReleaseService;
+use App\Support\ApkFile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 
+/**
+ * A release binary arrives one of two ways:
+ *
+ *   `apk`         — multipart upload, convenient for small/dev builds.
+ *   `staged_file` — the name of a file already dropped in the staging
+ *                   directory by SFTP, which is how a ~150 MB build gets in
+ *                   without fighting PHP upload limits.
+ *
+ * Exactly one of them is required.
+ */
 class StoreAppReleaseRequest extends FormRequest
 {
     public function authorize(): bool
@@ -35,15 +47,44 @@ class StoreAppReleaseRequest extends FormRequest
 
             'version_name' => ['required', 'string', 'max:30'],
 
-            // Android ships an APK as a ZIP container; the browser/curl MIME is
-            // unreliable, so the real check is the archive contents below.
             'apk' => [
-                'required',
+                'required_without:staged_file',
+                'prohibits:staged_file',
                 'file',
                 'max:'.(int) config('app_updates.max_apk_size_kb'),
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! $value instanceof UploadedFile || ! $this->looksLikeApk($value)) {
+                    if ($value === null) {
+                        return;                       // absence is required_without's job
+                    }
+
+                    if (! $value instanceof UploadedFile || ! ApkFile::isValid($value->getRealPath())) {
                         $fail('The uploaded file is not a valid Android APK.');
+                    }
+                },
+            ],
+
+            'staged_file' => [
+                'required_without:apk',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+
+                    // resolveStagedPath() refuses anything that is not a plain
+                    // file sitting directly in the staging directory, so a
+                    // traversal attempt fails here rather than being registered.
+                    $path = app(AppReleaseService::class)->resolveStagedPath((string) $value);
+
+                    if ($path === null) {
+                        $fail('No such file in the release staging directory.');
+
+                        return;
+                    }
+
+                    if (! ApkFile::isValid($path)) {
+                        $fail('The staged file is not a valid Android APK — it may be a partial upload.');
                     }
                 },
             ],
@@ -54,42 +95,5 @@ class StoreAppReleaseRequest extends FormRequest
 
             'is_critical' => ['sometimes', 'boolean'],
         ];
-    }
-
-    /**
-     * An APK is a ZIP whose root contains AndroidManifest.xml. Checking the
-     * magic bytes alone would accept any zip, so we look inside when the zip
-     * extension is available and fall back to the signature when it is not.
-     */
-    private function looksLikeApk(UploadedFile $file): bool
-    {
-        $path   = $file->getRealPath();
-        $handle = $path ? @fopen($path, 'rb') : false;
-
-        if ($handle === false) {
-            return false;
-        }
-
-        $magic = (string) fread($handle, 4);
-        fclose($handle);
-
-        if ($magic !== "PK\x03\x04") {
-            return false;
-        }
-
-        if (! class_exists(\ZipArchive::class)) {
-            return true;
-        }
-
-        $zip = new \ZipArchive();
-
-        if ($zip->open($path) !== true) {
-            return false;
-        }
-
-        $hasManifest = $zip->locateName('AndroidManifest.xml') !== false;
-        $zip->close();
-
-        return $hasManifest;
     }
 }

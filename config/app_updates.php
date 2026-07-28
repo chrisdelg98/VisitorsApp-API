@@ -41,4 +41,22 @@ return [
 
     'max_apk_size_kb' => (int) env('APP_UPDATE_MAX_APK_KB', 204800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Staging directory for APKs uploaded out of band
+    |--------------------------------------------------------------------------
+    |
+    | Path on the disk above where a build can be dropped by SFTP instead of
+    | being pushed through an HTTP request — the resilient route for a ~150 MB
+    | file, since it never touches PHP's upload limits or a proxy body cap.
+    |
+    | Admins list what is sitting here and register one of the files as a
+    | release; registering moves the file to its canonical path. Nothing here is
+    | ever served: a staged file is not a release until it is registered, and a
+    | release is not distributed until it is published.
+    |
+    */
+
+    'staging_path' => env('APP_UPDATE_STAGING_PATH', 'app-releases/incoming'),
+
 ];

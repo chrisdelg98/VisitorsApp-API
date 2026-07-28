@@ -56,10 +56,31 @@ class AppReleaseController extends Controller
     }
 
     /**
-     * POST /v1/admin/app-releases — upload a build (multipart).
+     * GET /v1/admin/app-releases/staged — APKs waiting in the staging directory.
      *
-     * Created as `draft`: uploading and publishing are separate steps so a
-     * 150 MB upload can be verified before the fleet starts pulling it.
+     * The secondary way in: drop the build there over SFTP and register it with
+     * `staged_file` instead of pushing 150 MB through an HTTP request. Nothing
+     * listed here is distributed — a staged file is not a release yet.
+     */
+    public function staged(Request $request): JsonResponse
+    {
+        if ($block = $this->ensureSuperAdmin($request)) {
+            return $block;
+        }
+
+        return response()->json([
+            'success'      => true,
+            'data'         => $this->releases->stagedFiles(),
+            'staging_path' => $this->releases->stagingAbsolutePath(),
+        ]);
+    }
+
+    /**
+     * POST /v1/admin/app-releases — register a build, uploaded either as
+     * multipart `apk` or as a `staged_file` already sitting in staging.
+     *
+     * Created as `draft`: registering and publishing are separate steps so a
+     * 150 MB binary can be verified before the fleet starts pulling it.
      */
     public function store(StoreAppReleaseRequest $request): JsonResponse
     {
@@ -70,7 +91,9 @@ class AppReleaseController extends Controller
         $platform    = (string) $request->string('platform');
         $versionCode = (int) $request->integer('version_code');
 
-        $file = $this->releases->storeApk($request->file('apk'), $platform, $versionCode);
+        $file = $request->filled('staged_file')
+            ? $this->adoptStagedFile($request, $platform, $versionCode)
+            : $this->releases->storeApk($request->file('apk'), $platform, $versionCode);
 
         $release = AppRelease::create([
             'platform'                   => $platform,
@@ -91,13 +114,30 @@ class AppReleaseController extends Controller
             'version_name' => $release->version_name,
             'file_size'    => $release->file_size,
             'file_hash'    => $release->file_hash,
+            'source'       => $request->filled('staged_file') ? 'staging' : 'upload',
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Release uploaded as draft. Publish it when it is verified.',
+            'message' => 'Release registered as draft. Publish it when it is verified.',
             'data'    => new AdminAppReleaseResource($release),
         ], 201);
+    }
+
+    /**
+     * Take a staged file as the release binary. The request already proved the
+     * name resolves inside the staging directory and that the bytes really are
+     * an APK, so all that is left is the hash the tablets check their download
+     * against — computed here, never asked of the operator.
+     *
+     * @return array{file_path: string, file_name: string, file_hash: string, file_size: int}
+     */
+    private function adoptStagedFile(StoreAppReleaseRequest $request, string $platform, int $versionCode): array
+    {
+        $fileName = (string) $request->string('staged_file');
+        $hash     = (string) hash_file('sha256', (string) $this->releases->resolveStagedPath($fileName));
+
+        return $this->releases->promoteStaged($fileName, $platform, $versionCode, $hash);
     }
 
     /**

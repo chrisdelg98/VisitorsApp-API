@@ -119,6 +119,7 @@ Route::prefix('v1')->group(function () {
 
             // App releases (super_admin only — enforced inside the controller)
             Route::get('/app-releases', [AdminAppReleaseController::class, 'index']);
+            Route::get('/app-releases/staged', [AdminAppReleaseController::class, 'staged']);
             Route::post('/app-releases', [AdminAppReleaseController::class, 'store']);
             Route::patch('/app-releases/{appRelease}', [AdminAppReleaseController::class, 'update']);
             Route::delete('/app-releases/{appRelease}', [AdminAppReleaseController::class, 'destroy']);
