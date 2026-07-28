@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\AppReleaseController as AdminAppReleaseController;
 use App\Http\Controllers\Api\V1\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Api\V1\Admin\CountryController as AdminCountryController;
 use App\Http\Controllers\Api\V1\Admin\StationController as AdminStationController;
 use App\Http\Controllers\Api\V1\Admin\StatsController as AdminStatsController;
 use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\VisitController as AdminVisitController;
+use App\Http\Controllers\Api\V1\AppUpdateController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ImageController;
 use App\Http\Controllers\Api\V1\OcrFailedDocumentController;
@@ -63,6 +65,20 @@ Route::prefix('v1')->group(function () {
     });
 
     // -----------------------------------------------------------------
+    // App auto-update — cheap check (30/min) and heavy download (5/min).
+    // Kept out of the tablet group above so the daily check does not drag
+    // the auto-close sweep along with it.
+    // -----------------------------------------------------------------
+    Route::middleware(['api.key', 'throttle:app-updates'])->group(function () {
+        Route::get('/app/latest', [AppUpdateController::class, 'latest']);
+    });
+
+    Route::middleware(['api.key', 'throttle:app-downloads'])->group(function () {
+        Route::get('/app/releases/{appRelease}/download', [AppUpdateController::class, 'download'])
+            ->name('app.releases.download');
+    });
+
+    // -----------------------------------------------------------------
     // Image upload — same auth, separate rate limiter (30/min/station)
     // -----------------------------------------------------------------
     Route::middleware(['api.key', 'throttle:uploads'])->group(function () {
@@ -100,6 +116,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/stations', [AdminStationController::class, 'store']);
             Route::post('/stations/{station}/reset-device', [AdminStationController::class, 'resetDevice']);
             Route::get('/stations/{station}/device-logs', [AdminStationController::class, 'deviceLogs']);
+
+            // App releases (super_admin only — enforced inside the controller)
+            Route::get('/app-releases', [AdminAppReleaseController::class, 'index']);
+            Route::post('/app-releases', [AdminAppReleaseController::class, 'store']);
+            Route::patch('/app-releases/{appRelease}', [AdminAppReleaseController::class, 'update']);
+            Route::delete('/app-releases/{appRelease}', [AdminAppReleaseController::class, 'destroy']);
 
             // Users (super_admin only — enforced inside the controller)
             Route::get('/users', [AdminUserController::class, 'index']);

@@ -66,6 +66,24 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by($key);
         });
 
+        // App update checks — cheap, but a device in a retry loop should not
+        // be able to hammer it.
+        RateLimiter::for('app-updates', function (Request $request) {
+            $station = $request->attributes->get('station');
+            $key = $station?->id ?? $request->ip();
+
+            return Limit::perMinute(30)->by($key);
+        });
+
+        // APK downloads — the binary is ~150 MB, so a handful per minute per
+        // station is already generous (a resumed download reuses this budget).
+        RateLimiter::for('app-downloads', function (Request $request) {
+            $station = $request->attributes->get('station');
+            $key = $station?->id ?? $request->ip();
+
+            return Limit::perMinute(5)->by($key);
+        });
+
         // Authenticated admin panel.
         RateLimiter::for('admin', function (Request $request) {
             $key = $request->user()?->id ?? $request->ip();
