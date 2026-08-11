@@ -28,18 +28,29 @@ class OcrFailedDocumentController extends Controller
         $station = $request->attributes->get('station');
         $data    = $request->validated();
 
-        $threshold       = (float) config('ocr.min_front_confidence', 0.20);
+        $min             = (float) config('ocr.min_front_confidence', 0.20);
+        $max             = (float) config('ocr.max_front_confidence', 0.40);
         $frontConfidence = (float) $data['front_confidence'];
 
-        // Filter out low-confidence noise. Return 200 (not 4xx) so the device
-        // treats it as handled and does not retry — the report is simply dropped.
-        if ($frontConfidence < $threshold) {
+        // Only reports inside [min, max) are worth a human's time: below is
+        // unusable noise, at or above it the app already recognized the
+        // document. Return 200 (not 4xx) either way so the device treats it as
+        // handled and does not retry — the report is simply dropped.
+        $reason = match (true) {
+            $frontConfidence < $min  => 'front_confidence_below_threshold',
+            $frontConfidence >= $max => 'front_confidence_above_threshold',
+            default                  => null,
+        };
+
+        if ($reason !== null) {
             AuditLogger::log('tablet.ocr.failed_document_skipped', $request, [
                 'station_id'       => $station ? (string) $station->id : null,
                 'station_code'     => $station ? (string) $station->code : null,
                 'detected_type'    => $data['detected_type'] ?? null,
                 'front_confidence' => $frontConfidence,
-                'threshold'        => $threshold,
+                'reason'           => $reason,
+                'min_confidence'   => $min,
+                'max_confidence'   => $max,
                 'app_version'      => $data['app_version'] ?? null,
             ]);
 
@@ -47,11 +58,12 @@ class OcrFailedDocumentController extends Controller
                 'success' => true,
                 'data'    => [
                     'stored'           => false,
-                    'reason'           => 'front_confidence_below_threshold',
-                    'threshold'        => $threshold,
+                    'reason'           => $reason,
                     'front_confidence' => $frontConfidence,
+                    'min_confidence'   => $min,
+                    'max_confidence'   => $max,
                 ],
-                'message' => 'Report received but not queued: front confidence below threshold.',
+                'message' => 'Report received but not queued: front confidence outside the review band.',
             ], 200);
         }
 

@@ -29,17 +29,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Front-side acceptance threshold
+    | Front-side acceptance band
     |--------------------------------------------------------------------------
     |
-    | A report is only queued when the FRONT classifier confidence is at least
-    | this value (0..1). The back side has no templates yet, so it always scores
-    | low and is never used to gate acceptance. This trims the flood of unusable
-    | low-confidence reports. Reports below the threshold get a 200 response with
-    | `stored: false` (no row is written, so the device does not retry).
+    | A report is only queued when the FRONT classifier confidence falls inside
+    | [min, max). The back side has no templates yet, so it always scores low and
+    | is never used to gate acceptance. Reports outside the band get a 200
+    | response with `stored: false` (no row is written, so the device does not
+    | retry) and never reach the review queue.
+    |
+    | `min` trims the flood of unusable low-confidence noise.
+    |
+    | `max` is the other end: above it the app essentially recognized the
+    | document, so the report says more about extraction than about a missing
+    | template and only buries the real work in the queue. The default 0.40
+    | means "39% and below gets reviewed"; the bound itself is excluded.
+    |
+    | Set OCR_MAX_FRONT_CONFIDENCE=1 to disable the upper bound entirely.
     |
     */
 
     'min_front_confidence' => (float) env('OCR_MIN_FRONT_CONFIDENCE', 0.20),
+
+    'max_front_confidence' => (float) env('OCR_MAX_FRONT_CONFIDENCE', 0.40),
 
 ];

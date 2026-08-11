@@ -41,7 +41,7 @@ class OcrFailedDocumentTest extends TestCase
     public function test_requires_an_api_key(): void
     {
         $this->postJson('/api/v1/ocr/failed-documents', [
-            'front_confidence' => 0.5,
+            'front_confidence' => 0.30,
             'front_blocks' => $this->frontBlocks(),
         ])
             ->assertStatus(401)
@@ -55,7 +55,7 @@ class OcrFailedDocumentTest extends TestCase
         $response = $this->withHeaders($this->headers($station))
             ->postJson('/api/v1/ocr/failed-documents', [
                 'detected_type' => 'SV_DUI',
-                'front_confidence' => 0.42,
+                'front_confidence' => 0.32,
                 'front_blocks' => $this->frontBlocks(),
                 'back_blocks' => $this->backBlocks(),
                 'app_version' => '1.4.2',
@@ -71,7 +71,7 @@ class OcrFailedDocumentTest extends TestCase
         $this->assertSame($station->id, $failed->station_id);
         $this->assertSame('pending', $failed->status);
         $this->assertSame('SV_DUI', $failed->detected_type);
-        $this->assertSame('0.420', (string) $failed->detected_confidence);
+        $this->assertSame('0.320', (string) $failed->detected_confidence);
         // Both sides live in one row, keyed by side.
         $this->assertCount(2, $failed->ocr_blocks['front']);
         $this->assertCount(1, $failed->ocr_blocks['back']);
@@ -85,7 +85,7 @@ class OcrFailedDocumentTest extends TestCase
 
         $response = $this->withHeaders($this->headers($station))
             ->postJson('/api/v1/ocr/failed-documents', [
-                'front_confidence' => 0.51,
+                'front_confidence' => 0.31,
                 'front_blocks' => $this->frontBlocks(),
                 'match_score' => 0.51,
                 'extracted_fields' => [
@@ -108,7 +108,7 @@ class OcrFailedDocumentTest extends TestCase
 
         $response = $this->withHeaders($this->headers($station))
             ->postJson('/api/v1/ocr/failed-documents', [
-                'front_confidence' => 0.5,
+                'front_confidence' => 0.30,
                 'front_blocks' => $this->frontBlocks(),
             ])
             ->assertCreated();
@@ -124,7 +124,7 @@ class OcrFailedDocumentTest extends TestCase
 
         $response = $this->withHeaders($this->headers($station))
             ->postJson('/api/v1/ocr/failed-documents', [
-                'front_confidence' => 0.5,
+                'front_confidence' => 0.30,
                 'front_blocks' => $this->frontBlocks(),
             ])
             ->assertCreated();
@@ -164,6 +164,65 @@ class OcrFailedDocumentTest extends TestCase
         $this->assertSame(1, OcrFailedDocument::count());
     }
 
+    /**
+     * The upper bound is what keeps the review queue useful: above it the app
+     * already recognized the document, so the report is not evidence of a
+     * missing template.
+     */
+    public function test_high_front_confidence_is_not_stored(): void
+    {
+        $station = $this->station();
+
+        $this->withHeaders($this->headers($station))
+            ->postJson('/api/v1/ocr/failed-documents', [
+                'front_confidence' => 0.45,
+                'front_blocks' => $this->frontBlocks(),
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.stored', false)
+            ->assertJsonPath('data.reason', 'front_confidence_above_threshold')
+            ->assertJsonPath('data.max_confidence', 0.4);
+
+        $this->assertSame(0, OcrFailedDocument::count());
+    }
+
+    public function test_confidence_exactly_at_the_upper_bound_is_not_stored(): void
+    {
+        $this->withHeaders($this->headers($this->station()))
+            ->postJson('/api/v1/ocr/failed-documents', [
+                'front_confidence' => 0.40,
+                'front_blocks' => $this->frontBlocks(),
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.stored', false);
+
+        $this->withHeaders($this->headers($this->station()))
+            ->postJson('/api/v1/ocr/failed-documents', [
+                'front_confidence' => 0.39,
+                'front_blocks' => $this->frontBlocks(),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.stored', true);
+
+        $this->assertSame(1, OcrFailedDocument::count());
+    }
+
+    public function test_the_band_is_configurable(): void
+    {
+        config(['ocr.min_front_confidence' => 0.0, 'ocr.max_front_confidence' => 1.0]);
+
+        foreach ([0.01, 0.55, 0.99] as $confidence) {
+            $this->withHeaders($this->headers($this->station()))
+                ->postJson('/api/v1/ocr/failed-documents', [
+                    'front_confidence' => $confidence,
+                    'front_blocks' => $this->frontBlocks(),
+                ])
+                ->assertCreated();
+        }
+
+        $this->assertSame(3, OcrFailedDocument::count());
+    }
+
     public function test_station_is_taken_from_the_api_key_not_the_body(): void
     {
         $station = $this->station();
@@ -172,7 +231,7 @@ class OcrFailedDocumentTest extends TestCase
         $response = $this->withHeaders($this->headers($station))
             ->postJson('/api/v1/ocr/failed-documents', [
                 'station_id' => $other->id,
-                'front_confidence' => 0.5,
+                'front_confidence' => 0.30,
                 'front_blocks' => $this->frontBlocks(),
             ])
             ->assertCreated();
@@ -211,7 +270,7 @@ class OcrFailedDocumentTest extends TestCase
 
         $response = $this->withHeaders($this->headers($station))
             ->post('/api/v1/ocr/failed-documents', [
-                'front_confidence' => 0.6,
+                'front_confidence' => 0.30,
                 'front_blocks' => json_encode($this->frontBlocks()),
                 'back_blocks' => json_encode($this->backBlocks()),
                 'extracted_fields' => json_encode(['first_name' => 'Arevalo Delgado']),
@@ -241,7 +300,7 @@ class OcrFailedDocumentTest extends TestCase
 
         $response = $this->withHeaders($this->headers($station))
             ->postJson('/api/v1/ocr/failed-documents', [
-                'front_confidence' => 0.6,
+                'front_confidence' => 0.30,
                 'front_blocks' => $this->frontBlocks(),
             ])
             ->assertCreated();
@@ -257,7 +316,7 @@ class OcrFailedDocumentTest extends TestCase
 
         $this->withHeaders($this->headers($this->station()))
             ->post('/api/v1/ocr/failed-documents', [
-                'front_confidence' => 0.6,
+                'front_confidence' => 0.30,
                 'front_blocks' => json_encode($this->frontBlocks()),
                 'front_image' => UploadedFile::fake()->create('front.jpg', 6000, 'image/jpeg'),
             ], ['Accept' => 'application/json'])
@@ -273,14 +332,14 @@ class OcrFailedDocumentTest extends TestCase
         $response = $this->withHeaders($this->headers($station))
             ->postJson('/api/v1/ocr/failed-documents', [
                 'detected_type' => 'SV_DUI',
-                'detected_confidence' => 0.5,
+                'detected_confidence' => 0.30,
                 'ocr_blocks' => $this->frontBlocks(),
             ])
             ->assertCreated();
 
         $failed = OcrFailedDocument::findOrFail($response->json('data.id'));
         $this->assertCount(2, $failed->ocr_blocks['front']);
-        $this->assertSame('0.500', (string) $failed->detected_confidence);
+        $this->assertSame('0.300', (string) $failed->detected_confidence);
     }
 
     public function test_pii_fields_are_hidden_from_serialization(): void
